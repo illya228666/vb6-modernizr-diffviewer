@@ -6,6 +6,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot 'src/Modernizr.DiffViewer/Modernizr.DiffViewer.csproj'
 $output = Join-Path $PSScriptRoot "artifacts/publish/$Runtime"
-dotnet publish $project -c Release -r $Runtime --self-contained -o $output
+dotnet publish $project -c Release -r $Runtime --self-contained -o $output -p:RestoreLockedMode=true
 if ($LASTEXITCODE -ne 0) { throw "DiffViewer publish failed with exit code $LASTEXITCODE." }
 Write-Host "Published $output"
