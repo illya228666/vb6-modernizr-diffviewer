@@ -13,7 +13,7 @@ public sealed record LaunchOptions
     public string? Encoding { get; }
 
     public const string Usage =
-        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged [--encoding <name>]""";
+        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged [--encoding <name>] [--format inline-rtf]""";
 
     public static LaunchOptions Parse(IReadOnlyList<string> arguments)
     {
@@ -21,7 +21,7 @@ public sealed record LaunchOptions
         for (var i = 0; i < arguments.Count; i += 2)
         {
             var key = arguments[i];
-            if (key is not ("--repo" or "--file" or "--mode" or "--encoding") || i + 1 == arguments.Count ||
+            if (key is not ("--repo" or "--file" or "--mode" or "--encoding" or "--format") || i + 1 == arguments.Count ||
                 string.IsNullOrWhiteSpace(arguments[i + 1]) || !values.TryAdd(key, arguments[i + 1]))
                 throw new ArgumentException($"Invalid argument: {key}");
         }
@@ -42,6 +42,9 @@ public sealed record LaunchOptions
             "unstaged" => ComparisonMode.Unstaged,
             _ => throw new ArgumentException("--mode must be staged or unstaged.")
         };
+        var format = values.GetValueOrDefault("--format");
+        if (format is not (null or "inline-rtf"))
+            throw new ArgumentException("--format must be inline-rtf.");
         return new(Path.GetFullPath(repo), path, mode, values.GetValueOrDefault("--encoding"));
     }
 }

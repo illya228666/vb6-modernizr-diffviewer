@@ -13,14 +13,9 @@ public partial class App : Application
         try
         {
             var options = LaunchOptions.Parse(e.Args);
-            var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Modernizr", "DiffViewer", "settings.json");
-            var settings = File.Exists(settingsPath)
-                ? JsonSerializer.Deserialize<ViewerSettings>(File.ReadAllText(settingsPath),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                : null;
+            var settings = ViewerSettings.Load();
             MainWindow = new MainWindow(options, options.Encoding ?? settings?.FallbackEncoding,
-                string.Equals(settings?.Theme, "dark", StringComparison.OrdinalIgnoreCase));
+                settings?.Dark == true);
             MainWindow.Show();
         }
         catch (ArgumentException ex)
@@ -36,5 +31,3 @@ public partial class App : Application
         }
     }
 }
-
-internal sealed record ViewerSettings(string? FallbackEncoding, string? Theme);

@@ -68,7 +68,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             NewLabel.Text = labels.Item2;
             if (text.Binary)
             {
-                Notice.Text = "Binary file. Text comparison is unavailable.";
+                Notice.Text = InlineRtf.BinaryNotice;
                 return;
             }
 
@@ -76,16 +76,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var sameLines = model.OldText.Lines.All(line => line.Type == ChangeType.Unchanged);
             if (sameLines && model.NewText.Lines.All(line => line.Type == ChangeType.Unchanged))
             {
-                Notice.Text = (versions.Old.Bytes, versions.New.Bytes) switch
-                {
-                    (null, null) => "The file is absent from both versions.",
-                    (null, _) => "Empty file added.",
-                    (_, null) => "Empty file deleted.",
-                    var (left, right) when left.AsSpan().SequenceEqual(right) && versions.Old.Path != versions.New.Path =>
-                        "File renamed. Content is unchanged.",
-                    var (left, right) when left.AsSpan().SequenceEqual(right) => "No content changes.",
-                    _ => "Text lines match. Encoding, byte order mark or line endings differ."
-                };
+                Notice.Text = DiffRows.UnchangedNotice(versions);
                 if (model.OldText.Lines.Count == 0)
                     return;
             }
@@ -144,33 +135,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var left = model.OldText.Lines;
         var right = model.NewText.Lines;
         changes.Clear();
-        for (var start = 0; start < left.Count;)
+        foreach (var run in DiffRows.Runs(model))
         {
-            var changed = left[start].Type != ChangeType.Unchanged || right[start].Type != ChangeType.Unchanged;
-            var end = start + 1;
-            while (end < left.Count &&
-                   changed == (left[end].Type != ChangeType.Unchanged || right[end].Type != ChangeType.Unchanged))
-                end++;
-
-            if (changed)
-            {
+            if (run.Changed)
                 changes.Add(rows.Count);
-                AppendChange(rows, left, right, start, end);
-            }
-            else if (collapsed && end - start > 7)
+
+            if (!run.Changed && collapsed && run.End - run.Start > 7)
             {
-                for (var i = start; i < start + 3; i++)
+                for (var i = run.Start; i < run.Start + 3; i++)
                     rows.Add(new(left[i], right[i]));
-                rows.Add(new(null, null, ContextLabel: $"⋯  {end - start - 6:N0} unchanged lines hidden"));
-                for (var i = end - 3; i < end; i++)
+                rows.Add(new(null, null, ContextLabel: $"⋯  {run.End - run.Start - 6:N0} unchanged lines hidden"));
+                for (var i = run.End - 3; i < run.End; i++)
                     rows.Add(new(left[i], right[i]));
+            }
+            else if (inline)
+            {
+                foreach (var row in DiffRows.Inline(model, run))
+                {
+                    var marker = row.Change switch
+                    {
+                        InlineChange.Removed => "−",
+                        InlineChange.Added => "+",
+                        _ => ""
+                    };
+                    rows.Add(new(row.Left, row.Right, marker));
+                }
             }
             else
             {
-                for (var i = start; i < end; i++)
+                for (var i = run.Start; i < run.End; i++)
                     rows.Add(new(left[i], right[i]));
             }
-            start = end;
         }
 
         Rows.ItemsSource = null;
@@ -184,22 +179,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         else
             UpdateNavigation();
         UpdateHorizontal();
-    }
-
-    private void AppendChange(List<DisplayRow> rows, List<DiffPiece> left, List<DiffPiece> right, int start, int end)
-    {
-        if (!inline)
-        {
-            for (var i = start; i < end; i++)
-                rows.Add(new(left[i], right[i]));
-            return;
-        }
-        for (var i = start; i < end; i++)
-            if (left[i].Position is not null)
-                rows.Add(new(left[i], null, "−"));
-        for (var i = start; i < end; i++)
-            if (right[i].Position is not null)
-                rows.Add(new(null, right[i], "+"));
     }
 
     private void UpdateNavigation()

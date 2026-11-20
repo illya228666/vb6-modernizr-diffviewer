@@ -28,9 +28,19 @@ The script publishes a self-contained version of the application to `artifacts/p
 
 View modes share the same change groups. Use **Next** or **F7** and **Previous** or **Shift+F7** to navigate. **Hide unchanged** keeps three context lines at each end of a folded section. The bottom scrollbar pans long lines while the line numbers stay visible.
 
+## Embedded in VB6
+
+The VB6 add-in launches the same executable with `--format inline-rtf` to render a comparison in the IDE. The process writes a UTF-8 response to `stdout` and diagnostics to `stderr`. Successful output starts with three LF-terminated lines:
+
+1. `MODERNIZR-INLINE-RTF-1`
+2. `light` or `dark`
+3. A comma-separated list of zero-based UTF-16 positions for the starts of changed groups, or an empty line.
+
+An ASCII RTF document follows. The offsets count each Rich Edit paragraph separator as one character. The export and the standalone window share change grouping and line order. An export can be run by adding `--format inline-rtf` to the standalone command and redirecting `stdout`.
+
 ## Configuration and limits
 
-Optional defaults go in `%LOCALAPPDATA%ModernizrDiffViewersettings.json`.
+Optional defaults go in `%LOCALAPPDATA%\Modernizr\DiffViewer\settings.json`.
 
 ```json
 {
@@ -39,7 +49,7 @@ Optional defaults go in `%LOCALAPPDATA%ModernizrDiffViewersettings.json`.
 }
 ```
 
-The decoder checks each version for a BOM, then strict UTF-8, then the selected fallback or the Windows ANSI code page. Line endings and final newline state are shown in the version headers. A pure encoding or line-ending change has matching visible lines and an explanatory status. The viewer compares raw blob and disk contents. Repository filters and text conversion are outside that comparison.
+The decoder checks each version for a BOM, then strict UTF-8, then the selected fallback or the Windows ANSI code page. The standalone window shows line endings and final newline state in the version headers. A pure encoding or line-ending change has matching visible lines and an explanatory status. The viewer compares raw blob and disk contents. Repository filters and text conversion are outside that comparison.
 
 The viewer recognizes staged renames when Git finds a matching source. Unstaged filesystem moves appear as deletion and addition. Binary resources, unresolved index stages, links and submodules display a message. Each side is limited to 4 MiB, 40,000 lines and 65,536 characters per line. Very long modified lines keep line highlighting and skip word highlighting.
 
