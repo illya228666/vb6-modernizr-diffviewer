@@ -1,0 +1,52 @@
+# Modernizr DiffViewer
+
+Modernizr DiffViewer is a read-only Windows viewer for a single file in a local Git worktree. It opens from the Staged and Unstaged lists in VB6 Modernizr and can also run directly from the command line.
+
+| Mode | Left | Right |
+| --- | --- | --- |
+| Staged | HEAD | INDEX |
+| Unstaged | INDEX | WORKING TREE |
+
+WORKING TREE means the saved file on disk. Save a file in VB6 to include its editor changes. An untracked file has an empty comparison baseline. The viewer labels absent and empty versions separately.
+
+## Build and run
+
+On Windows, install the .NET 10 SDK and a current Git for Windows with `git.exe` on PATH. From this repository:
+
+```powershell
+dotnet test -c Release
+.\publish.ps1
+```
+
+The script publishes a self-contained version of the application to `artifacts/publish/win-x64`. Use `-Runtime win-arm64` or `-Runtime win-x86` to target another Windows architecture. Keep the whole publish directory together. The published app requires Git and can run without an installed .NET runtime or VB6.
+
+```powershell
+.\artifacts\publish\win-x64\Modernizr.DiffViewer.exe --repo "C:\VB Projects\Demo" --file "Forms\Überblick.frm" --mode unstaged
+```
+
+`--repo` takes the absolute Git worktree root, including a UNC path. Git's normal repository trust checks apply. `--file` takes the exact repository-relative Git path with forward or backslashes. `--mode` takes `staged` or `unstaged`. Use `--encoding windows-1251` or `--encoding 1251` to set the fallback encoding for one launch.
+
+View modes share the same change groups. Use **Next** or **F7** and **Previous** or **Shift+F7** to navigate. **Hide unchanged** keeps three context lines at each end of a folded section. The bottom scrollbar pans long lines while the line numbers stay visible.
+
+## Configuration and limits
+
+Optional defaults go in `%LOCALAPPDATA%ModernizrDiffViewersettings.json`.
+
+```json
+{
+  "fallbackEncoding": "windows-1251",
+  "theme": "dark"
+}
+```
+
+The decoder checks each version for a BOM, then strict UTF-8, then the selected fallback or the Windows ANSI code page. Line endings and final newline state are shown in the version headers. A pure encoding or line-ending change has matching visible lines and an explanatory status. The viewer compares raw blob and disk contents. Repository filters and text conversion are outside that comparison.
+
+The viewer recognizes staged renames when Git finds a matching source. Unstaged filesystem moves appear as deletion and addition. Binary resources, unresolved index stages, links and submodules display a message. Each side is limited to 4 MiB, 40,000 lines and 65,536 characters per line. Very long modified lines keep line highlighting and skip word highlighting.
+
+## Design
+
+The core reads Git objects and working tree bytes using Git CLI, decodes each side independently and delegates line and word differencing to DiffPlex. The WPF client draws both sides in one virtualized scrolling list and reuses the alignment model for inline view. The CLI and the core have no dependency on the VB6 add-in.
+
+[DiffPlex](https://github.com/mmanela/diffplex) provides the Apache-2.0 diff engine. Its WPF controls were evaluated alongside [DiffViewer](https://github.com/geevensingh/DiffViewer), whose separate CLI, read, diff and navigation layers informed the design. [Ähnlich](https://github.com/Dirkster99/Aehnlich) informed the layout and theme review. [AvalonEdit](https://github.com/icsharpcode/AvalonEdit), [side-by-side-diffs](https://github.com/shiftkey/side-by-side-diffs) and [Diff.Net](https://github.com/menees/Diff.Net) were reviewed as alternatives.
+
+The module is licensed under GPLv3. See [LICENSE](LICENSE).
