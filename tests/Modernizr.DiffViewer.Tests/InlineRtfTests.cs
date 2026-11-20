@@ -8,6 +8,56 @@ namespace Modernizr.DiffViewer.Tests;
 
 public sealed class InlineRtfTests(ITestOutputHelper output)
 {
+    [Fact]
+    public void EditorPreviewKeepsWordColorsAndExcludesTheDesignerAndHiddenAttributes()
+    {
+        const string old = "VERSION 5.00\nBegin VB.Form Form1\n Caption = \"A\"\nEnd\n"
+            + "Attribute VB_Name = \"Form1\"\nOption Explicit\nPrivate Sub Save()\n"
+            + "Attribute Save.VB_Description = \"hidden\"\n\tSaveOrder(id) ' Grüße\nEnd Sub\n";
+        var current = old.Replace("Caption = \"A\"", "Caption = \"B\"")
+            .Replace("\"hidden\"", "\"updated\"").Replace("(id)", "(orderId)");
+        var parts = ExportEditor(old, current, ".frm");
+
+        Assert.Equal([EditorHunks.Signature, "light", "1", "2\t1\t1\t1",
+            "Option Explicit", "Private Sub Save()", "11:7\t\tSaveOrder(orderId) ' Grüße", "End Sub"], parts[..8]);
+        using var rich = new HiddenRichEdit(parts[8]);
+        var preview = rich.Read(0, 100);
+        Assert.Contains("INDEX → WORKING TREE\r−  \tSaveOrder(id) ' Grüße", preview);
+        Assert.Equal(0xC0BAF3, rich.Background(preview.IndexOf("(id)", StringComparison.Ordinal) + 1));
+        Assert.DoesNotContain("Caption", preview);
+        Assert.DoesNotContain("Attribute", preview);
+    }
+
+    [Theory]
+    [InlineData("obsolete\nSave\nEnd Sub\n", "Save\nEnd Sub\n", "0\t0\t2\t1")]
+    [InlineData("Save\nEnd Sub\nobsolete\n", "Save\nEnd Sub\n", "2\t0\t0\t1")]
+    public void EditorExportIncludesBothKindsOfDeletionBoundary(string old, string current, string expected)
+    {
+        var parts = ExportEditor(old, current);
+        Assert.Equal(["1", expected, "Save", "End Sub"], parts[2..6]);
+        using var rich = new HiddenRichEdit(parts[6]);
+        Assert.Contains("−  obsolete", rich.Read(0, 100));
+    }
+
+    [Fact]
+    public void EditorExportHandlesAFileAdditionAndExcludesBinary()
+    {
+        var added = ExportEditor(null, "Option Explicit\n");
+        Assert.Equal(["1", "0\t1\t0\t0", "\tOption Explicit"], added[2..5]);
+        using var rich = new HiddenRichEdit(added[5]);
+        Assert.Contains("Added lines", rich.Read(0, 100));
+        Assert.Equal([EditorHunks.Signature, "light", "0", ""], ExportEditor("old", "new", ".frx"));
+    }
+
+    private static string[] ExportEditor(string? old, string? current, string extension = ".bas")
+    {
+        var versions = new FileComparison(new("INDEX", "Module" + extension, Bytes(old)),
+            new("WORKING TREE", "Module" + extension, Bytes(current)), false);
+        using var output = new StringWriter();
+        EditorHunks.Write(output, versions, ComparisonText.Decode(versions, null), dark: false);
+        return output.ToString().Split('\n');
+    }
+
     [Theory]
     [InlineData(false, 0xEEEDFC, 0xC0BAF3, 0xEDF6E8, 0xC0DFA9)]
     [InlineData(true, 0x2F2942, 0x4B4177, 0x2E381A, 0x49632D)]

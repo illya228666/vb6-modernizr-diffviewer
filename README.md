@@ -38,6 +38,10 @@ The VB6 add-in launches the same executable with `--format inline-rtf` to render
 
 An ASCII RTF document follows. The offsets count each Rich Edit paragraph separator as one character. The export and the standalone window share change grouping and line order. An export can be run by adding `--format inline-rtf` to the standalone command and redirecting `stdout`.
 
+DiffViewer 0.3.0 and later also accept `--format editor-hunks`. This export compares the code visible in VB6 after omitting the designer header and hidden attributes. Modernizr uses it to place Git markers and changed-word underlines in the active editor and show previous lines on demand.
+
+The UTF-8 export starts with `MODERNIZR-EDITOR-HUNKS-1`, the theme and the hunk count on separate LF-terminated lines. Each hunk starts with four tab-separated counts for preceding context, new rows, following context and removed rows. The context rows are plain text. Each new row starts with a comma-separated list of zero-based UTF-16 `offset:length` spans and a tab. A single line of ASCII RTF containing the previous text completes the hunk.
+
 ## Configuration and limits
 
 Optional defaults go in `%LOCALAPPDATA%\Modernizr\DiffViewer\settings.json`.

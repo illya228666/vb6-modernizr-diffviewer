@@ -39,6 +39,11 @@ public sealed class GitReaderTests : IDisposable
         var unstaged = await Read(path, "unstaged");
         Assert.Equal(("INDEX", "WORKING TREE"), (unstaged.Old.Label, unstaged.New.Label));
         Assert.Equal(("INDEX\r\n", "WORKING TREE\r\n"), Texts(unstaged));
+        using var editor = new StringWriter();
+        EditorHunks.Write(editor, unstaged, ComparisonText.Decode(unstaged, null), dark: false);
+        Assert.Contains("\tWORKING TREE\n", editor.ToString());
+        Assert.Contains("INDEX", editor.ToString());
+        Assert.DoesNotContain("HEAD", editor.ToString());
         Assert.Equal(files, Snapshot());
         Assert.Equal(indexTime, File.GetLastWriteTimeUtc(FullPath(".git/index")));
         Assert.False(File.Exists(FullPath(".git/index.lock")));

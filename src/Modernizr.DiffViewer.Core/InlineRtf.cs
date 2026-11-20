@@ -38,6 +38,23 @@ public static class InlineRtf
         document.Write(output);
     }
 
+    internal static string RemovedPreview(IEnumerable<DiffPiece> lines, string oldLabel, string newLabel, bool dark)
+    {
+        var document = new Document(dark);
+        document.Paragraph($"{oldLabel} → {newLabel}", @"\cf2\b");
+        var any = false;
+        foreach (var line in lines)
+        {
+            document.Row(new(line, null, InlineChange.Removed), compact: true);
+            any = true;
+        }
+        if (!any)
+            document.Paragraph("Added lines", @"\cf2");
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        document.WriteRtf(output);
+        return output.ToString().Replace("\n", "", StringComparison.Ordinal);
+    }
+
     private sealed class Document
     {
         private readonly StringBuilder rtf;
@@ -78,7 +95,7 @@ public static class InlineRtf
             EndParagraph();
         }
 
-        public void Row(InlineRow row)
+        public void Row(InlineRow row, bool compact = false)
         {
             var (lineColor, wordColor, marker) = row.Change switch
             {
@@ -87,7 +104,8 @@ public static class InlineRtf
                 _ => (0, 0, " ")
             };
             rtf.Append(@"\highlight").Append(lineColor).Append(@" {\cf2 ");
-            var prefix = FormattableString.Invariant($"{row.Left?.Position,NumberWidth} {row.Right?.Position,NumberWidth}   {marker}  ");
+            var prefix = compact ? $"{marker}  " :
+                FormattableString.Invariant($"{row.Left?.Position,NumberWidth} {row.Right?.Position,NumberWidth}   {marker}  ");
             AppendText(prefix);
             rtf.Append('}');
 
@@ -153,6 +171,11 @@ public static class InlineRtf
             output.Write(dark ? "dark\n" : "light\n");
             output.Write(string.Join(",", Changes.Select(position => position.ToString(CultureInfo.InvariantCulture))));
             output.Write('\n');
+            WriteRtf(output);
+        }
+
+        public void WriteRtf(TextWriter output)
+        {
             foreach (var chunk in rtf.GetChunks())
                 output.Write(chunk.Span);
             output.Write('}');

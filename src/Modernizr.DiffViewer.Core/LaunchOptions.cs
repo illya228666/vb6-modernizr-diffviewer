@@ -11,9 +11,10 @@ public sealed record LaunchOptions
     public string RelativePath { get; }
     public ComparisonMode Mode { get; }
     public string? Encoding { get; }
+    public string? Format { get; private init; }
 
     public const string Usage =
-        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged [--encoding <name>] [--format inline-rtf]""";
+        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged [--encoding <name>] [--format inline-rtf|editor-hunks]""";
 
     public static LaunchOptions Parse(IReadOnlyList<string> arguments)
     {
@@ -43,8 +44,8 @@ public sealed record LaunchOptions
             _ => throw new ArgumentException("--mode must be staged or unstaged.")
         };
         var format = values.GetValueOrDefault("--format");
-        if (format is not (null or "inline-rtf"))
-            throw new ArgumentException("--format must be inline-rtf.");
-        return new(Path.GetFullPath(repo), path, mode, values.GetValueOrDefault("--encoding"));
+        if (format is not (null or "inline-rtf" or "editor-hunks"))
+            throw new ArgumentException("--format must be inline-rtf or editor-hunks.");
+        return new(Path.GetFullPath(repo), path, mode, values.GetValueOrDefault("--encoding")) { Format = format };
     }
 }

@@ -14,14 +14,14 @@ internal static class Program
         // Inspect option names only. A file can itself be named "--format".
         for (var index = 0; index < args.Length; index += 2)
             if (args[index] == "--format")
-                return ExportInline(args);
+                return Export(args);
 
         var app = new App();
         app.InitializeComponent();
         return app.Run();
     }
 
-    private static int ExportInline(string[] args)
+    private static int Export(string[] args)
     {
         try
         {
@@ -30,7 +30,10 @@ internal static class Program
             var versions = new GitReader().ReadAsync(options).GetAwaiter().GetResult();
             var text = ComparisonText.Decode(versions, options.Encoding ?? settings?.FallbackEncoding);
             using var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false));
-            InlineRtf.Write(output, versions, text, settings?.Dark == true);
+            if (options.Format == "editor-hunks")
+                EditorHunks.Write(output, versions, text, settings?.Dark == true);
+            else
+                InlineRtf.Write(output, versions, text, settings?.Dark == true);
             return 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or
