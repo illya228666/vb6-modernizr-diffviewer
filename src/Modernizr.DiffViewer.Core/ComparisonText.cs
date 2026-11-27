@@ -10,6 +10,7 @@ namespace Modernizr.DiffViewer.Core;
 public sealed record DecodedVersion(string Text, string Encoding, string LineEndings, bool FinalNewline);
 public sealed record ComparisonText(DecodedVersion? Old, DecodedVersion? New, bool Binary)
 {
+    public bool VisualBasic { get; init; }
     private static readonly string[] BinaryExtensions =
         [".frx", ".res", ".ctx", ".dsx", ".dox", ".pgx", ".dll", ".exe", ".ocx", ".ico"];
     private static readonly (byte[] Mark, Encoding Codec)[] Bom =
@@ -38,7 +39,10 @@ public sealed record ComparisonText(DecodedVersion? Old, DecodedVersion? New, bo
         var current = DecodeVersion(versions.New.Bytes, codec);
         var binary = (versions.Old.Bytes is not null && old is null) ||
                      (versions.New.Bytes is not null && current is null);
-        return new(old, current, binary);
+        return new(old, current, binary)
+        {
+            VisualBasic = Vb6Code.IsModulePath(versions.Old.Path) && Vb6Code.IsModulePath(versions.New.Path)
+        };
     }
 
     private static bool IsBinaryExtension(FileVersion version) =>
@@ -91,10 +95,64 @@ public static class TextDiff
         var oldText = comparison.Old?.Text ?? "";
         var newText = comparison.New?.Text ?? "";
         var lines = new FileLineChunker();
-        Validate(lines.Chunk(oldText));
-        Validate(lines.Chunk(newText));
-        return new SideBySideDiffBuilder(Differ.Instance, lines, new BoundedWordChunker())
+        var oldLines = lines.Chunk(oldText);
+        var newLines = lines.Chunk(newText);
+        Validate(oldLines);
+        Validate(newLines);
+        if (!comparison.VisualBasic)
+            return BuildModel(oldText, newText);
+
+        var left = Vb6Code.Read(oldLines);
+        var right = Vb6Code.Read(newLines);
+        var model = BuildModel(JoinKeys(left), JoinKeys(right));
+        for (var index = 0; index < model.OldText.Lines.Count; index++)
+        {
+            var before = model.OldText.Lines[index];
+            var after = model.NewText.Lines[index];
+            if (before.Position is int oldPosition && after.Position is int newPosition)
+            {
+                var oldLine = left[oldPosition - 1];
+                var newLine = right[newPosition - 1];
+                var changedIndent = !oldLine.Numbered && !newLine.Numbered &&
+                    !oldLine.Original.AsSpan(0, oldLine.BodyOffset)
+                        .SequenceEqual(newLine.Original.AsSpan(0, newLine.BodyOffset));
+                Restore(before, oldLine, changedIndent ? ChangeType.Deleted : ChangeType.Unchanged);
+                Restore(after, newLine, changedIndent ? ChangeType.Inserted : ChangeType.Unchanged);
+            }
+            else if (before.Position is int deleted)
+                before.Text = left[deleted - 1].Original;
+            else if (after.Position is int added)
+                after.Text = right[added - 1].Original;
+        }
+        return model;
+    }
+
+    private static SideBySideDiffModel BuildModel(string oldText, string newText) =>
+        new SideBySideDiffBuilder(Differ.Instance, new FileLineChunker(), new BoundedWordChunker())
             .BuildDiffModel(oldText, newText, ignoreWhitespace: false, ignoreCase: false);
+
+    private static string JoinKeys(Vb6Code[] lines) =>
+        lines.Length == 0 ? "" : string.Join('\n', lines.Select(line => line.Key)) + '\n';
+
+    private static void Restore(DiffPiece piece, Vb6Code line, ChangeType prefixType)
+    {
+        piece.Text = line.Original;
+        var offset = line.BodyOffset;
+        foreach (var word in piece.SubPieces)
+        {
+            if (word.Text is null)
+                continue;
+            word.Text = line.Original.Substring(offset, word.Text.Length);
+            offset += word.Text.Length;
+        }
+
+        if (prefixType != ChangeType.Unchanged && piece.Type == ChangeType.Unchanged)
+        {
+            piece.Type = ChangeType.Modified;
+            piece.SubPieces.Add(new(line.Original[line.BodyOffset..], ChangeType.Unchanged));
+        }
+        if (piece.SubPieces.Count > 0 && line.BodyOffset > 0)
+            piece.SubPieces.Insert(0, new(line.Original[..line.BodyOffset], prefixType));
     }
 
     private static void Validate(IReadOnlyList<string> lines)

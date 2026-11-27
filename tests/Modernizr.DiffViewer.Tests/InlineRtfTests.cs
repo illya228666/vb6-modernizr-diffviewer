@@ -9,6 +9,18 @@ namespace Modernizr.DiffViewer.Tests;
 public sealed class InlineRtfTests(ITestOutputHelper output)
 {
     [Fact]
+    public void NumberedEditorHunkReturnsOriginalWorkingTreeContextAndWordOffset()
+    {
+        const string old = "95    Debug.Print \"BEFORE \" & retryLimit\n100    Debug.Print \"separator\"\n";
+        const string current = "100    DEBUG.PRINT \"AFTER \" & RetryLimit\n105    Debug.Print \"separator\"\n";
+        var parts = ExportEditor(old, current);
+        Assert.Equal(["1", "0\t1\t1\t1", "19:6\t100    DEBUG.PRINT \"AFTER \" & RetryLimit",
+            "105    Debug.Print \"separator\""], parts[2..6]);
+        var inline = Export(old, current);
+        Assert.Single(inline.Changes);
+    }
+
+    [Fact]
     public void EditorPreviewKeepsWordColorsAndExcludesTheDesignerAndHiddenAttributes()
     {
         const string old = "VERSION 5.00\nBegin VB.Form Form1\n Caption = \"A\"\nEnd\n"

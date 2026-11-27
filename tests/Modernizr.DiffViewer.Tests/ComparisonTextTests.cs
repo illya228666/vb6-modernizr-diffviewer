@@ -65,6 +65,88 @@ public sealed class ComparisonTextTests
     }
 
     [Fact]
+    public void HandlesRenumberingAndIdeCapitalizationAfterAStatementIsInserted()
+    {
+        const string old = """
+            Public Sub Main()
+            100    Debug.Print "separator"
+            105    Debug.Print "separator number two"
+            110    Debug.Print RetryLimit
+            End Sub
+            """;
+        const string current = """
+            Public Sub Main()
+            95     Debug.Print "new statement"
+            105    debug.print "separator"
+            110:   Debug.Print "separator number two"
+            115    Debug.Print retryLimit
+            End Sub
+            """;
+        var model = BuildText(old, current);
+        Assert.Equal(["95     Debug.Print \"new statement\""], model.NewText.Lines
+            .Where(line => line.Type == ChangeType.Inserted).Select(line => line.Text));
+        Assert.Single(DiffRows.Runs(model), run => run.Changed);
+        Assert.Equal("100    Debug.Print \"separator\"", model.OldText.Lines[2].Text);
+        Assert.Equal("105    debug.print \"separator\"", model.NewText.Lines[2].Text);
+        Assert.Equal(ChangeType.Unchanged, model.NewText.Lines[2].Type);
+
+        var reversed = BuildText(current, old);
+        Assert.Single(DiffRows.Runs(reversed), run => run.Changed);
+        Assert.Equal("95     Debug.Print \"new statement\"",
+            Assert.Single(reversed.OldText.Lines, line => line.Type == ChangeType.Deleted).Text);
+    }
+
+    [Fact]
+    public void IgnoresOnlyTheLabelOnAChangedNumberedRow()
+    {
+        const string old = "95: Debug.Print \"BEFORE \" & retryLimit";
+        const string current = "100    DEBUG.PRINT \"AFTER \" & RetryLimit";
+        var model = BuildText(old, current);
+
+        var left = Assert.Single(model.OldText.Lines);
+        var right = Assert.Single(model.NewText.Lines);
+        Assert.Equal(ChangeType.Modified, right.Type);
+        Assert.Equal(current, string.Concat(right.SubPieces.Select(part => part.Text)));
+        Assert.Equal(old, string.Concat(left.SubPieces.Select(part => part.Text)));
+        Assert.Equal(["\"AFTER"], right.SubPieces.Where(part => part.Type == ChangeType.Inserted)
+            .Select(part => part.Text));
+    }
+
+    [Theory]
+    [InlineData("10 Debug.Print \"A\"\" B\"", "15 Debug.Print \"A\"\" b\"")]
+    [InlineData("10 GoTo 20", "15 GOTO 30")]
+    [InlineData("10 Rem User message", "20 rem user message")]
+    [InlineData("10 x = 1: Rem User message", "20 x = 1: rem user message")]
+    [InlineData("x = _\n    100 + value", "x = _\n    200 + Value")]
+    [InlineData("    Debug.Print 1", "  debug.print 1")]
+    public void KeepsMeaningfulTextChanges(string old, string current)
+    {
+        Assert.Contains(DiffRows.Runs(BuildText(old, current)), run => run.Changed);
+    }
+
+    [Theory]
+    [InlineData("    Debug.Print value", "100    debug.print Value")]
+    [InlineData("10", "20:")]
+    [InlineData("10: 'Same comment", "20   'Same comment")]
+    [InlineData("10 rem Same comment", "20 REM Same comment")]
+    public void IgnoresCasingAndLabelOnlyChanges(string old, string current)
+    {
+        Assert.DoesNotContain(DiffRows.Runs(BuildText(old, current)), run => run.Changed);
+    }
+
+    [Theory]
+    [InlineData("Module.txt", "100    Debug.Print X", "110    debug.print x")]
+    [InlineData("Form.frm", "VERSION 5.00\nBegin VB.Form Main\n    Caption = \"Test\"\nEnd\nAttribute VB_Name = \"Main\"",
+        "VERSION 5.00\nBegin VB.Form MAIN\n    Caption = \"Test\"\nEnd\nAttribute VB_Name = \"Main\"")]
+    public void KeepsExactComparisonOutsideVb6Code(string path, string old, string current)
+    {
+        Assert.Contains(DiffRows.Runs(BuildText(old, current, path)), run => run.Changed);
+    }
+
+    private static SideBySideDiffModel BuildText(string old, string current, string path = "Module.bas") =>
+        TextDiff.Build(ComparisonText.Decode(Compare(Encoding.UTF8.GetBytes(old), Encoding.UTF8.GetBytes(current), path), null));
+
+    [Fact]
     public void BuildsALargeModuleAndKeepsLongLinesIntact()
     {
         var module = string.Join('\n', Enumerable.Range(0, 12_000).Select(index => "' VB6 line " + index)) + "\n";

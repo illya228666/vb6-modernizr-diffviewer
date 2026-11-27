@@ -76,7 +76,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var sameLines = model.OldText.Lines.All(line => line.Type == ChangeType.Unchanged);
             if (sameLines && model.NewText.Lines.All(line => line.Type == ChangeType.Unchanged))
             {
-                Notice.Text = DiffRows.UnchangedNotice(versions);
+                Notice.Text = DiffRows.UnchangedNotice(versions, model);
                 if (model.OldText.Lines.Count == 0)
                     return;
             }

@@ -46,11 +46,13 @@ public static class DiffRows
                 yield return new(null, right[i], InlineChange.Added);
     }
 
-    public static string UnchangedNotice(FileComparison versions) => (versions.Old.Bytes, versions.New.Bytes) switch
+    public static string UnchangedNotice(FileComparison versions, SideBySideDiffModel model) => (versions.Old.Bytes, versions.New.Bytes) switch
     {
         (null, null) => "The file is absent from both versions.",
         (null, _) => "Empty file added.",
         (_, null) => "Empty file deleted.",
+        _ when model.OldText.Lines.Zip(model.NewText.Lines).Any(pair => pair.First.Text != pair.Second.Text) =>
+            "VB6 code matches after ignoring capitalization and line numbers.",
         var (left, right) when !left.AsSpan().SequenceEqual(right) =>
             "Text lines match. Encoding, byte order mark or line endings differ.",
         _ when versions.Old.Path != versions.New.Path => "File renamed. Content is unchanged.",

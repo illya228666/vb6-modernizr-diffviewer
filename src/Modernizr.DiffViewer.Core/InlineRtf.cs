@@ -25,7 +25,7 @@ public static class InlineRtf
             var model = TextDiff.Build(text);
             var runs = DiffRows.Runs(model).ToArray();
             if (!runs.Any(run => run.Changed))
-                document.Paragraph(DiffRows.UnchangedNotice(comparison), @"\cf2");
+                document.Paragraph(DiffRows.UnchangedNotice(comparison, model), @"\cf2");
             foreach (var run in runs)
             {
                 if (run.Changed)

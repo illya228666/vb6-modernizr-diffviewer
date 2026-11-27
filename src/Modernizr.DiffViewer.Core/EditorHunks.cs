@@ -10,7 +10,7 @@ public static class EditorHunks
 
     public static void Write(TextWriter output, FileComparison comparison, ComparisonText text, bool dark)
     {
-        var model = text.Binary ? null : TextDiff.Build(new(ProjectCode(text.Old), ProjectCode(text.New), false));
+        var model = text.Binary ? null : TextDiff.Build(text with { Old = ProjectCode(text.Old), New = ProjectCode(text.New) });
         var runs = model is null ? [] : DiffRows.Runs(model).ToArray();
 
         output.Write($"{Signature}\n{(dark ? "dark" : "light")}\n");
@@ -70,10 +70,9 @@ public static class EditorHunks
             return null;
 
         var lines = version.Text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
-        var name = Array.FindIndex(lines, line => line.StartsWith("Attribute VB_Name = ", StringComparison.OrdinalIgnoreCase));
         // VB6 exports declare VB_Name between the designer/header and the code.
         // Procedure attributes can appear anywhere after that boundary.
-        var code = lines.Skip(name + 1).Where(line => !IsHiddenAttribute(line));
+        var code = lines.Skip(Vb6Code.StartOfCode(lines)).Where(line => !IsHiddenAttribute(line));
         return version with { Text = string.Join('\n', code) };
     }
 
