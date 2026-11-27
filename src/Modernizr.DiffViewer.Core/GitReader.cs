@@ -41,14 +41,15 @@ public sealed class GitReader
 
         var indexEntry = indexEntries.SingleOrDefault();
         FileVersion oldVersion;
-        FileVersion newVersion;
-        if (options.Mode == ComparisonMode.Staged)
+        if (options.Mode == ComparisonMode.Unstaged)
+            oldVersion = await ReadBlob(repo, "INDEX", path, indexEntry, token);
+        else
         {
             var headResult = await Run(repo, MaxMetadataBytes, token, "rev-parse", "--verify", "--quiet", "HEAD^{commit}");
             var head = headResult.ExitCode == 1 ? null : headResult.Text().TrimEnd('\r', '\n');
             var oldPath = path;
             var headEntry = head is null ? null : await TreeEntry(repo, head, path, token);
-            if (headEntry is null && indexEntry is not null)
+            if (headEntry is null && indexEntry is not null && (head is not null || options.Mode == ComparisonMode.Staged))
             {
                 // A path filter would hide the rename source.
                 var staged = await Query(repo, token, "diff", "--cached", "--name-status", "-z",
@@ -63,14 +64,11 @@ public sealed class GitReader
                 }
             }
             oldVersion = await ReadBlob(repo, "HEAD", oldPath, headEntry, token);
-            newVersion = await ReadBlob(repo, "INDEX", path, indexEntry, token);
-        }
-        else
-        {
-            oldVersion = await ReadBlob(repo, "INDEX", path, indexEntry, token);
-            newVersion = new("WORKING TREE", path, await ReadDisk(repo, path, token));
         }
 
+        var newVersion = options.Mode == ComparisonMode.Staged
+            ? await ReadBlob(repo, "INDEX", path, indexEntry, token)
+            : new FileVersion("WORKING TREE", path, await ReadDisk(repo, path, token));
         string[] paths = oldVersion.Path == path ? [path] : [oldVersion.Path, path];
         var attrs = Records(await Query(repo, token, ["check-attr", "-z", "diff", "--", ..paths]));
         return new(oldVersion, newVersion, attrs.Where((_, i) => i % 3 == 2).Contains("unset"));

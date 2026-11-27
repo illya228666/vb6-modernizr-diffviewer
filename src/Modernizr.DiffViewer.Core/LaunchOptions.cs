@@ -1,6 +1,6 @@
 namespace Modernizr.DiffViewer.Core;
 
-public enum ComparisonMode { Staged, Unstaged }
+public enum ComparisonMode { Staged, Unstaged, Uncommitted }
 
 public sealed record LaunchOptions
 {
@@ -14,7 +14,7 @@ public sealed record LaunchOptions
     public string? Format { get; private init; }
 
     public const string Usage =
-        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged [--encoding <name>] [--format inline-rtf|editor-hunks]""";
+        """Modernizr.DiffViewer.exe --repo "<worktree root>" --file "<relative path>" --mode staged|unstaged|uncommitted [--encoding <name>] [--format inline-rtf|editor-hunks]""";
 
     public static LaunchOptions Parse(IReadOnlyList<string> arguments)
     {
@@ -41,7 +41,8 @@ public sealed record LaunchOptions
         {
             "staged" => ComparisonMode.Staged,
             "unstaged" => ComparisonMode.Unstaged,
-            _ => throw new ArgumentException("--mode must be staged or unstaged.")
+            "uncommitted" => ComparisonMode.Uncommitted,
+            _ => throw new ArgumentException("--mode must be staged, unstaged or uncommitted.")
         };
         var format = values.GetValueOrDefault("--format");
         if (format is not (null or "inline-rtf" or "editor-hunks"))

@@ -39,14 +39,53 @@ public sealed class GitReaderTests : IDisposable
         var unstaged = await Read(path, "unstaged");
         Assert.Equal(("INDEX", "WORKING TREE"), (unstaged.Old.Label, unstaged.New.Label));
         Assert.Equal(("INDEX\r\n", "WORKING TREE\r\n"), Texts(unstaged));
+        var combined = await Read(path, "uncommitted");
+        Assert.Equal(("HEAD", "WORKING TREE"), (combined.Old.Label, combined.New.Label));
+        Assert.Equal(("HEAD\r\n", "WORKING TREE\r\n"), Texts(combined));
         using var editor = new StringWriter();
-        EditorHunks.Write(editor, unstaged, ComparisonText.Decode(unstaged, null), dark: false);
+        EditorHunks.Write(editor, combined, ComparisonText.Decode(combined, null), dark: false);
         Assert.Contains("\tWORKING TREE\n", editor.ToString());
-        Assert.Contains("INDEX", editor.ToString());
-        Assert.DoesNotContain("HEAD", editor.ToString());
+        Assert.Contains("HEAD", editor.ToString());
+        Assert.DoesNotContain("INDEX", editor.ToString());
         Assert.Equal(files, Snapshot());
         Assert.Equal(indexTime, File.GetLastWriteTimeUtc(FullPath(".git/index")));
         Assert.False(File.Exists(FullPath(".git/index.lock")));
+    }
+
+    [Fact]
+    public async Task StagingDoesNotChangeTheEditorDiff()
+    {
+        const string path = "Module.bas";
+        Put(path, "Option Explicit\nPublic Const RetryLimit = 3\n");
+        Commit();
+        Put(path, "Option Explicit\nPublic Const RetryLimit = 27\n");
+        var beforeStage = await Read(path, "uncommitted");
+        Git("add", "--", path);
+        var files = Snapshot();
+        var afterStage = await Read(path, "uncommitted");
+
+        Assert.Equal(Texts(beforeStage), Texts(afterStage));
+        var unstaged = await Read(path, "unstaged");
+        Assert.Equal(Texts(unstaged).Item1, Texts(unstaged).Item2);
+        var model = TextDiff.Build(ComparisonText.Decode(afterStage, null));
+        Assert.Single(DiffRows.Runs(model), run => run.Changed);
+        Assert.Equal(files, Snapshot());
+    }
+
+    [Fact]
+    public async Task WorkingTreeBackAtHeadHasNoEditorChangesEvenWithAStagedVersion()
+    {
+        const string path = "Module.bas";
+        Put(path, "Option Explicit\n");
+        Commit();
+        Put(path, "Option Explicit\nPublic Const RetryLimit = 27\n");
+        Git("add", "--", path);
+        Put(path, "Option Explicit\n");
+
+        var combined = await Read(path, "uncommitted");
+        Assert.Equal(("Option Explicit\n", "Option Explicit\n"), Texts(combined));
+        var model = TextDiff.Build(ComparisonText.Decode(combined, null));
+        Assert.DoesNotContain(DiffRows.Runs(model), run => run.Changed);
     }
 
     [Fact]
@@ -55,9 +94,12 @@ public sealed class GitReaderTests : IDisposable
         const string path = "Sub Folder/Новый.bas";
         Put(path, "new\n");
         Assert.Equal((null, "new\n"), Texts(await Read(path, "unstaged")));
+        Assert.Equal((null, "new\n"), Texts(await Read(path, "uncommitted")));
         Assert.False(File.Exists(FullPath(".git/index")));
         Git("add", "--", path);
         Assert.Equal((null, "new\n"), Texts(await Read(path, "staged")));
+        Put(path, "new since staging\n");
+        Assert.Equal((null, "new since staging\n"), Texts(await Read(path, "uncommitted")));
     }
 
     [Fact]
@@ -96,6 +138,9 @@ public sealed class GitReaderTests : IDisposable
         Assert.Equal(newPath, comparison.New.Path);
         Assert.Equal((before, staged), Texts(comparison));
         Assert.Equal((staged, staged + "unstaged\n"), Texts(await Read(newPath, "unstaged")));
+        var combined = await Read(newPath, "uncommitted");
+        Assert.Equal((oldPath, newPath), (combined.Old.Path, combined.New.Path));
+        Assert.Equal((before, staged + "unstaged\n"), Texts(combined));
     }
 
     [Fact]
@@ -110,6 +155,7 @@ public sealed class GitReaderTests : IDisposable
     [Theory]
     [InlineData("staged")]
     [InlineData("unstaged")]
+    [InlineData("uncommitted")]
     public async Task UnchangedFileHasNoChangedRows(string mode)
     {
         Put("same.cls", "same\r\n");

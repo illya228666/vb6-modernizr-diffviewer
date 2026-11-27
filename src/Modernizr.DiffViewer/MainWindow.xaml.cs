@@ -37,11 +37,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Title = Path.GetFileName(options.RelativePath) + "  ·  Modernizr DiffViewer";
         FileTitle.Text = options.RelativePath;
         Repository.Text = options.Repository;
-        OldLabel.Text = options.Mode == ComparisonMode.Staged ? "HEAD" : "INDEX";
+        OldLabel.Text = options.Mode == ComparisonMode.Unstaged ? "INDEX" : "HEAD";
         NewLabel.Text = options.Mode == ComparisonMode.Staged ? "INDEX" : "WORKING TREE";
-        Status.Text = options.Mode == ComparisonMode.Unstaged
-            ? "Read-only  ·  WORKING TREE shows the saved file on disk"
-            : "Read-only  ·  Staged contents";
+        Status.Text = options.Mode == ComparisonMode.Staged
+            ? "Read-only  ·  Staged contents"
+            : "Read-only  ·  WORKING TREE shows the saved file on disk";
         Loaded += LoadComparison;
         Closed += (_, _) => closing.Cancel();
     }

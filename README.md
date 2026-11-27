@@ -6,6 +6,7 @@ Modernizr DiffViewer is a read-only Windows viewer for a single file in a local 
 | --- | --- | --- |
 | Staged | HEAD | INDEX |
 | Unstaged | INDEX | WORKING TREE |
+| Uncommitted | HEAD | WORKING TREE |
 
 WORKING TREE means the saved file on disk. Save a file in VB6 to include its editor changes. An untracked file has an empty comparison baseline. The viewer labels absent and empty versions separately.
 
@@ -24,7 +25,7 @@ The script publishes a self-contained version of the application to `artifacts/p
 .\artifacts\publish\win-x64\Modernizr.DiffViewer.exe --repo "C:\VB Projects\Demo" --file "Forms\Überblick.frm" --mode unstaged
 ```
 
-`--repo` takes the absolute Git worktree root, including a UNC path. Git's normal repository trust checks apply. `--file` takes the exact repository-relative Git path with forward or backslashes. `--mode` takes `staged` or `unstaged`. Use `--encoding windows-1251` or `--encoding 1251` to set the fallback encoding for one launch.
+`--repo` takes the absolute Git worktree root, including a UNC path. Git's normal repository trust checks apply. `--file` takes the exact repository-relative Git path with forward or backslashes. `--mode` takes `staged`, `unstaged` or `uncommitted`. Use `--encoding windows-1251` or `--encoding 1251` to set the fallback encoding for one launch.
 
 View modes share the same change groups. Use **Next** or **F7** and **Previous** or **Shift+F7** to navigate. **Hide unchanged** keeps three context lines at each end of a folded section. The bottom scrollbar pans long lines while the line numbers stay visible.
 
@@ -39,6 +40,8 @@ The VB6 add-in launches the same executable with `--format inline-rtf` to render
 An ASCII RTF document follows. The offsets count each Rich Edit paragraph separator as one character. The export and the standalone window share change grouping and line order. An export can be run by adding `--format inline-rtf` to the standalone command and redirecting `stdout`.
 
 DiffViewer 0.3.0 and later also accept `--format editor-hunks`. This export compares the code visible in VB6 after omitting the designer header and hidden attributes. Modernizr uses it to place Git markers and changed-word underlines in the active editor and show previous lines on demand.
+
+With DiffViewer 0.5.0 or later, the editor uses `--mode uncommitted` so staging leaves its comparison intact. An unborn HEAD gives this mode an empty baseline.
 
 In VB6 modules, diff views ignore capitalization in code and numeric labels at the start of a line, such as `105    Debug.Print value` and `105: Debug.Print value`. They compare string literals, comments, branch target numbers and designer metadata as written. The displayed lines keep their original capitalization and numbering.
 
