@@ -69,3 +69,17 @@ The core reads Git objects and working tree bytes using Git CLI, decodes each si
 [DiffPlex](https://github.com/mmanela/diffplex) provides the Apache-2.0 diff engine. Its WPF controls were evaluated alongside [DiffViewer](https://github.com/geevensingh/DiffViewer), whose separate CLI, read, diff and navigation layers informed the design. [Ähnlich](https://github.com/Dirkster99/Aehnlich) informed the layout and theme review. [AvalonEdit](https://github.com/icsharpcode/AvalonEdit), [side-by-side-diffs](https://github.com/shiftkey/side-by-side-diffs) and [Diff.Net](https://github.com/menees/Diff.Net) were reviewed as alternatives.
 
 The module is licensed under GPLv3. See [LICENSE](LICENSE).
+## Editor merge
+
+Modernizr uses `--editor-merge "<job path>" "<display path>" <owner HWND>`
+to review external file changes against an unsaved VB6 buffer. The job
+path has three input files with suffixes `.base`, `.editor` and `.disk`.
+Each contains CRLF editor text as UTF-16LE without a BOM. The window
+combines independent edits and requires an explicit choice for each
+conflict.
+
+On Apply, the viewer writes the chosen text to the job path with a
+`MODERNIZR-MERGE-1` header followed by CRLF. Exit codes are 0 for Apply,
+2 for Cancel and 1 on failure. The VB6 add-in owns the input snapshots,
+checks that they still match and updates its editor buffer. The helper
+only receives temporary files for this mode.
